@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Meditation</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #ffffff;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            margin: 0;
+            transition: background-color 0.8s ease;
+        }
+
+        /* 瞑想中のダークモード演出 */
+        body.meditating { background-color: #1a1a1a; color: #fff; }
+        body.meditating #timer-display { color: #fff; }
+        body.meditating h1, body.meditating h2 { color: #444; }
+
+        h1 { font-weight: 200; letter-spacing: 2px; margin-bottom: 50px; transition: color 0.8s; }
+
+        #timer-display {
+            font-size: 4rem;
+            font-weight: 100;
+            margin-bottom: 40px;
+            color: #000;
+            font-variant-numeric: tabular-nums;
+            transition: color 0.8s;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+
+        .choices {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            border: none;
+            padding: 15px 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            border-radius: 4px;
+        }
+
+        /* グラデーション：2分は文字色を黒に、20分は少し薄いグレーに設定 */
+        .btn-2  { background-color: #eeeeee; color: #333; border: 1px solid #eee; }
+        .btn-5  { background-color: #dddddd; color: #333; }
+        .btn-10 { background-color: #cccccc; color: #333; }
+        .btn-15 { background-color: #999999; color: #fff; }
+        .btn-20 { background-color: #555555; color: #fff; }
+
+        #reset-btn {
+            background: none;
+            color: #666;
+            text-decoration: underline;
+            font-size: 0.8rem;
+            visibility: hidden;
+            border: none;
+            padding: 0;
+        }
+
+        button:hover:not(:disabled) { opacity: 0.8; transform: translateY(-2px); }
+        button:disabled { opacity: 0; pointer-events: none; }
+
+        /* 記録エリア */
+        .history-container {
+            width: 100%;
+            max-width: 400px;
+            border-top: 1px solid #eee;
+            padding-top: 30px;
+        }
+
+        h2 { font-size: 1.2rem; font-weight: 400; color: #666; margin-bottom: 20px; transition: color 0.8s; }
+
+        .history-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #fafafa;
+            font-size: 0.9rem;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>MEDITATION</h1>
+
+    <div id="timer-display">00:00</div>
+
+    <div class="button-group">
+        <div class="choices" id="choices">
+            <button class="btn-2" onclick="startTimer(2)">2分</button>
+            <button class="btn-5" onclick="startTimer(5)">5分</button>
+            <button class="btn-10" onclick="startTimer(10)">10分</button>
+            <button class="btn-15" onclick="startTimer(15)">15分</button>
+            <button class="btn-20" onclick="startTimer(20)">20分</button>
+        </div>
+        <button id="reset-btn" onclick="resetTimer()">QUIT</button>
+    </div>
+
+    <div class="history-container">
+        <h2>History</h2>
+        <div id="history-log" class="history-list"></div>
+    </div>
+
+    <script>
+        let countdown;
+        let timeLeft;
+        let wakeLock = null;
+        let audioContext = null;
+
+        // 記録の復元
+        window.onload = function() {
+            const saved = localStorage.getItem('meditation_logs');
+            if (saved) {
+                document.getElementById('history-log').innerHTML = saved;
+            }
+        };
+
+        // スリープ防止
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {}
+            }
+        }
+
+        function startTimer(minutes) {
+            // iOS対策：タップした瞬間にAudioContextを生成
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioContext = new AudioContext();
+            
+            // 空の音を鳴らして「音を出す権利」を確立
+            const silentOsc = audioContext.createOscillator();
+            const silentGain = audioContext.createGain();
+            silentGain.gain.value = 0;
+            silentOsc.connect(silentGain);
+            silentGain.connect(audioContext.destination);
+            silentOsc.start();
+            silentOsc.stop(audioContext.currentTime + 0.01);
+
+            requestWakeLock();
+            
+            clearInterval(countdown);
+            document.body.classList.add('meditating');
+            toggleButtons(true);
+            
+            timeLeft = minutes * 60;
+            updateDisplay();
+
+            countdown = setInterval(() => {
+                timeLeft--;
+                updateDisplay();
+                if (timeLeft <= 0) {
+                    completeMeditation(minutes);
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            if(confirm("瞑想を中断しますか？")) stopAll();
+        }
+
+        function completeMeditation(minutes) {
+            saveRecord(minutes);
+            playAlarm();
+            // アラーム音を鳴らしてから停止処理
+            setTimeout(() => {
+                alert(minutes + "分の瞑想が終了しました。");
+                stopAll();
+            }, 1600);
+        }
+
+        function stopAll() {
+            clearInterval(countdown);
+            if (wakeLock !== null) {
+                wakeLock.release().then(() => wakeLock = null);
+            }
+            document.getElementById('timer-display').innerText = "00:00";
+            document.body.classList.remove('meditating');
+            toggleButtons(false);
+        }
+
+        function toggleButtons(isRunning) {
+            const buttons = document.querySelectorAll('#choices button');
+            buttons.forEach(b => b.disabled = isRunning);
+            document.getElementById('reset-btn').style.visibility = isRunning ? 'visible' : 'hidden';
+        }
+
+        function updateDisplay() {
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            document.getElementById('timer-display').innerText = 
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function playAlarm() {
+            if (!audioContext) return;
+            
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            // 音色と強弱の設定（C5の音）
+            osc.frequency.setValueAtTime(523.25, audioContext.currentTime); 
+            gain.gain.setValueAtTime(0, audioContext.currentTime);
+            gain.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1.5);
+
+            osc.start(audioContext.currentTime);
+            osc.stop(audioContext.currentTime + 1.5);
+        }
+
+        function saveRecord(minutes) {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
+            const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            const historyLog = document.getElementById('history-log');
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.innerHTML = `<span>${dateStr} ${timeStr}</span><span>${minutes}分間</span>`;
+            historyLog.prepend(item);
+
+            localStorage.setItem('meditation_logs', historyLog.innerHTML);
+        }
+    </script>
+</body>
+</html>
