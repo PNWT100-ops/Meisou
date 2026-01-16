@@ -17,12 +17,26 @@
             transition: background-color 0.8s ease;
         }
 
-        /* 瞑想中のダークモード演出 */
-        body.meditating { background-color: #1a1a1a; color: #fff; }
-        body.meditating #timer-display { color: #fff; }
-        body.meditating h1, body.meditating h2 { color: #444; }
+        body.meditating { 
+            background-color: #1a1a1a; 
+            color: #fff; 
+        }
+        
+        body.meditating #timer-display { 
+            color: #fff; 
+        }
+        
+        body.meditating h1, 
+        body.meditating h2 { 
+            color: #444; 
+        }
 
-        h1 { font-weight: 200; letter-spacing: 2px; margin-bottom: 50px; transition: color 0.8s; }
+        h1 { 
+            font-weight: 200; 
+            letter-spacing: 2px; 
+            margin-bottom: 50px; 
+            transition: color 0.8s; 
+        }
 
         #timer-display {
             font-size: 4rem;
@@ -57,12 +71,31 @@
             border-radius: 4px;
         }
 
-        /* グラデーション：2分は文字色を黒に、20分は少し薄いグレーに設定 */
-        .btn-2  { background-color: #eeeeee; color: #333; border: 1px solid #eee; }
-        .btn-5  { background-color: #dddddd; color: #333; }
-        .btn-10 { background-color: #cccccc; color: #333; }
-        .btn-15 { background-color: #999999; color: #fff; }
-        .btn-20 { background-color: #555555; color: #fff; }
+        .btn-2  { 
+            background-color: #eeeeee; 
+            color: #333; 
+            border: 1px solid #eee; 
+        }
+        
+        .btn-5  { 
+            background-color: #dddddd; 
+            color: #333; 
+        }
+        
+        .btn-10 { 
+            background-color: #cccccc; 
+            color: #333; 
+        }
+        
+        .btn-15 { 
+            background-color: #999999; 
+            color: #fff; 
+        }
+        
+        .btn-20 { 
+            background-color: #555555; 
+            color: #fff; 
+        }
 
         #reset-btn {
             background: none;
@@ -74,10 +107,16 @@
             padding: 0;
         }
 
-        button:hover:not(:disabled) { opacity: 0.8; transform: translateY(-2px); }
-        button:disabled { opacity: 0; pointer-events: none; }
+        button:hover:not(:disabled) { 
+            opacity: 0.8; 
+            transform: translateY(-2px); 
+        }
+        
+        button:disabled { 
+            opacity: 0; 
+            pointer-events: none; 
+        }
 
-        /* 記録エリア */
         .history-container {
             width: 100%;
             max-width: 400px;
@@ -107,7 +146,7 @@
             font-size: 0.8rem;
             cursor: pointer;
             text-decoration: underline;
-            padding: 0;
+            padding: 5px 10px;
         }
 
         #clear-history-btn:hover {
@@ -117,6 +156,7 @@
         .history-list {
             list-style: none;
             padding: 0;
+            margin: 0;
         }
 
         .history-item {
@@ -159,9 +199,8 @@
         let timeLeft;
         let wakeLock = null;
         let audioContext = null;
-        let isCompleted = false; // 二重実行防止フラグ
+        let isCompleted = false;
 
-        // 記録の復元
         window.onload = function() {
             const saved = localStorage.getItem('meditation_logs');
             if (saved) {
@@ -169,7 +208,6 @@
             }
         };
 
-        // スリープ防止
         async function requestWakeLock() {
             if ('wakeLock' in navigator) {
                 try {
@@ -179,11 +217,9 @@
         }
 
         function startTimer(minutes) {
-            // iOS対策：タップした瞬間にAudioContextを生成
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioContext = new AudioContext();
             
-            // 空の音を鳴らして「音を出す権利」を確立
             const silentOsc = audioContext.createOscillator();
             const silentGain = audioContext.createGain();
             silentGain.gain.value = 0;
@@ -195,7 +231,7 @@
             requestWakeLock();
             
             clearInterval(countdown);
-            isCompleted = false; // フラグをリセット
+            isCompleted = false;
             document.body.classList.add('meditating');
             toggleButtons(true);
             
@@ -206,25 +242,25 @@
                 timeLeft--;
                 updateDisplay();
                 if (timeLeft <= 0) {
-                    clearInterval(countdown); // すぐにタイマーを止める
+                    clearInterval(countdown);
                     completeMeditation(minutes);
                 }
             }, 1000);
         }
 
         function resetTimer() {
-            if(confirm("瞑想を中断しますか？")) stopAll();
+            if(confirm("瞑想を中断しますか？")) {
+                stopAll();
+            }
         }
 
         function completeMeditation(minutes) {
-            // 二重実行を防止
             if (isCompleted) return;
             isCompleted = true;
 
             saveRecord(minutes);
             playAlarm();
             
-            // アラーム音を鳴らしてから停止処理
             setTimeout(() => {
                 alert(minutes + "分の瞑想が終了しました。");
                 stopAll();
@@ -239,7 +275,7 @@
             document.getElementById('timer-display').innerText = "00:00";
             document.body.classList.remove('meditating');
             toggleButtons(false);
-            isCompleted = false; // フラグをリセット
+            isCompleted = false;
         }
 
         function toggleButtons(isRunning) {
@@ -264,7 +300,6 @@
             osc.connect(gain);
             gain.connect(audioContext.destination);
 
-            // 音色と強弱の設定（C5の音）
             osc.frequency.setValueAtTime(523.25, audioContext.currentTime); 
             gain.gain.setValueAtTime(0, audioContext.currentTime);
             gain.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
