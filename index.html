@@ -85,7 +85,34 @@
             padding-top: 30px;
         }
 
-        h2 { font-size: 1.2rem; font-weight: 400; color: #666; margin-bottom: 20px; transition: color 0.8s; }
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h2 { 
+            font-size: 1.2rem; 
+            font-weight: 400; 
+            color: #666; 
+            margin: 0;
+            transition: color 0.8s; 
+        }
+
+        #clear-history-btn {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+        }
+
+        #clear-history-btn:hover {
+            color: #666;
+        }
 
         .history-list {
             list-style: none;
@@ -120,7 +147,10 @@
     </div>
 
     <div class="history-container">
-        <h2>History</h2>
+        <div class="history-header">
+            <h2>History</h2>
+            <button id="clear-history-btn" onclick="clearHistory()">Clear</button>
+        </div>
         <div id="history-log" class="history-list"></div>
     </div>
 
@@ -129,6 +159,7 @@
         let timeLeft;
         let wakeLock = null;
         let audioContext = null;
+        let isCompleted = false; // 二重実行防止フラグ
 
         // 記録の復元
         window.onload = function() {
@@ -164,6 +195,7 @@
             requestWakeLock();
             
             clearInterval(countdown);
+            isCompleted = false; // フラグをリセット
             document.body.classList.add('meditating');
             toggleButtons(true);
             
@@ -174,6 +206,7 @@
                 timeLeft--;
                 updateDisplay();
                 if (timeLeft <= 0) {
+                    clearInterval(countdown); // すぐにタイマーを止める
                     completeMeditation(minutes);
                 }
             }, 1000);
@@ -184,8 +217,13 @@
         }
 
         function completeMeditation(minutes) {
+            // 二重実行を防止
+            if (isCompleted) return;
+            isCompleted = true;
+
             saveRecord(minutes);
             playAlarm();
+            
             // アラーム音を鳴らしてから停止処理
             setTimeout(() => {
                 alert(minutes + "分の瞑想が終了しました。");
@@ -201,6 +239,7 @@
             document.getElementById('timer-display').innerText = "00:00";
             document.body.classList.remove('meditating');
             toggleButtons(false);
+            isCompleted = false; // フラグをリセット
         }
 
         function toggleButtons(isRunning) {
@@ -247,6 +286,13 @@
             historyLog.prepend(item);
 
             localStorage.setItem('meditation_logs', historyLog.innerHTML);
+        }
+
+        function clearHistory() {
+            if (confirm('記録をすべて削除しますか？')) {
+                localStorage.removeItem('meditation_logs');
+                document.getElementById('history-log').innerHTML = '';
+            }
         }
     </script>
 </body>
